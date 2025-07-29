@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import splrep, splev
+from scipy.ndimage import median_filter, binary_dilation
 import sys
 
 class NormalizadorEspectro:
@@ -16,13 +17,11 @@ class NormalizadorEspectro:
         self.pontos_continuo_selecionados = []
         self.continuo_ajustado = None
         self.fluxo_normalizado = None
-        # Mascara para ignorar regioes de emissao ao selecionar pontos de continuo
-        # Por padrao, considera todos os pontos validos
-        self.emission_mask = np.ones_like(self.flux, dtype=bool)
+        self.emission_mask = self._detectar_regioes_emissao()
 
         # Parâmetros para ajuste robusto (sigma-clipping)
         self.low_reject = 3.0
-        self.high_reject = 0.0
+        self.high_reject = 3.0
         self.niterate = 5
         self.median_window_size = 10.0
 
@@ -37,6 +36,19 @@ class NormalizadorEspectro:
         except Exception as e:
             print(f"Erro ao carregar o arquivo '{filename}': {e}")
             sys.exit(1)
+
+    def _detectar_regioes_emissao(self, width=5, sigma_threshold=3.0, dilate=3):
+        """Identifica regiões de fortes emissões para ignorá-las ao selecionar pontos."""
+        if len(self.flux) < width:
+            return np.ones_like(self.flux, dtype=bool)
+
+        smoothed = median_filter(self.flux, size=width)
+        resid = self.flux - smoothed
+        sigma = np.std(resid)
+        emission = resid > sigma_threshold * sigma
+        if np.any(emission) and dilate > 1:
+            emission = binary_dilation(emission, iterations=dilate)
+        return ~emission
 
     def _configurar_plot(self):
         self.fig, self.ax = plt.subplots(figsize=(12, 6))
@@ -58,6 +70,7 @@ class NormalizadorEspectro:
         print("  - Pressione 'r' para redefinir.")
         print("  - Pressione 'w' para salvar o espectro normalizado.")
         print("  - Pressione 'q' para sair.")
+        print("  - Regiões de emissão intensas são ignoradas ao selecionar pontos.")
         print("-------------------------\n")
         plt.show()
 
@@ -82,7 +95,7 @@ class NormalizadorEspectro:
             mask = self.emission_mask[inicio_idx : fim_idx + 1]
 
             if not np.any(mask):
-                # Nenhum ponto valido segundo a mascara; usa valor do pixel selecionado
+                # Nenhum ponto valido na mascara; usa o valor do pixel selecionado
                 y_val = self.flux[idx_proximo]
             elif inicio_idx >= fim_idx:
                 y_val = self.flux[idx_proximo]
@@ -217,7 +230,7 @@ class NormalizadorEspectro:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Uso: python normalizador_espectro.py <caminho_para_arquivo_espectro.txt>")
+        print("Uso: python norm.py <caminho_para_arquivo_espectro.txt>")
         sys.exit(1)
 
     caminho_arquivo_espectro = sys.argv[1]
