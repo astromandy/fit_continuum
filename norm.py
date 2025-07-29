@@ -208,7 +208,7 @@ class NormalizadorEspectro:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Uso: python normalizador_espectro.py <caminho_para_arquivo_espectro.txt>")
+        print("Uso: python norm.py <caminho_para_arquivo_espectro.txt>")
         sys.exit(1)
 
     caminho_arquivo_espectro = sys.argv[1]
