@@ -16,6 +16,9 @@ class NormalizadorEspectro:
         self.pontos_continuo_selecionados = []
         self.continuo_ajustado = None
         self.fluxo_normalizado = None
+        # Mascara para ignorar regioes de emissao ao selecionar pontos de continuo
+        # Por padrao, considera todos os pontos validos
+        self.emission_mask = np.ones_like(self.flux, dtype=bool)
 
         # Parâmetros para ajuste robusto (sigma-clipping)
         self.low_reject = 3.0
@@ -75,10 +78,16 @@ class NormalizadorEspectro:
             inicio_idx = max(0, idx_proximo - meia_janela_idx)
             fim_idx = min(len(self.wavelength) - 1, idx_proximo + meia_janela_idx)
 
-            if inicio_idx >= fim_idx:
+            flux_segment = self.flux[inicio_idx : fim_idx + 1]
+            mask = self.emission_mask[inicio_idx : fim_idx + 1]
+
+            if not np.any(mask):
+                # Nenhum ponto valido segundo a mascara; usa valor do pixel selecionado
+                y_val = self.flux[idx_proximo]
+            elif inicio_idx >= fim_idx:
                 y_val = self.flux[idx_proximo]
             else:
-                y_val = np.median(self.flux[inicio_idx : fim_idx + 1])
+                y_val = np.median(flux_segment[mask])
 
             self.pontos_continuo_selecionados.append((x_clique, y_val))
             self._atualizar_plot()
